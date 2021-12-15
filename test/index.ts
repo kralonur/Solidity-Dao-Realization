@@ -253,6 +253,48 @@ describe("DAO", function () {
         await expect(contract.vote(0, 1))
             .to.be.revertedWith("Voting is already ended");
     });
+
+    it("Should vote for someone else", async function () {
+        const ercContract = await getErcContract(owner, contract);
+
+        const mintOwner = 1000;
+        ercContract.mint(owner.address, mintOwner);
+        const mintUser = 500;
+        ercContract.mint(accounts[1].address, mintUser);
+
+        await contract.setErcContract(ercContract.address);
+
+        await ercContract.approve(contract.address, mintOwner);
+        await ercContract.connect(accounts[1]).approve(contract.address, mintUser);
+        await contract.deposit(mintOwner);
+        await contract.connect(accounts[1]).deposit(mintUser);
+
+        const description = "Standard voting";
+        const recipient = ercContract.address;
+        const callData = getApproveCallData(owner);
+
+        await contract["createVoting(string,address,bytes)"](description, recipient, callData);
+
+        await expect(contract.connect(accounts[1]).voteFor(0, owner.address, 1))
+            .to.be.revertedWith("This address did not delegate his votes to any address yet");
+
+        await contract.delegateVotesTo(accounts[1].address);
+
+        await expect(contract.connect(accounts[2]).voteFor(0, owner.address, 1))
+            .to.be.revertedWith("You cannot vote for this address");
+
+        // accounts[1] votes FOR, for himself
+        await contract.connect(accounts[1]).vote(0, 1);
+        // accounts[1] votes AGAINST, for owner
+        await contract.connect(accounts[1]).voteFor(0, owner.address, 2);
+
+        // accounts[1] vote should be equal to FOR
+        expect((await contract.getAddressVote(0, accounts[1].address)))
+            .to.equal(1);
+        // owner vote should be equal to AGAINST
+        expect((await contract.getAddressVote(0, owner.address)))
+            .to.equal(2);
+    });
 })
 
 async function simulateVotingEnded() {
