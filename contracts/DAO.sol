@@ -1,0 +1,232 @@
+//SPDX-License-Identifier: Unlicense
+pragma solidity ^0.8.0;
+
+import "./IERC20.sol";
+
+contract DAO {
+    enum VoteOption {
+        NONE,
+        FOR,
+        AGAINST
+    }
+
+    enum VotingResult {
+        NONE,
+        ACCEPTED,
+        REJECTED,
+        INVALID
+    }
+
+    struct Voting {
+        string description;
+        uint256 createdAt;
+        uint256 duration;
+        uint256 totalSupplyAtCreation;
+        uint256 totalFor;
+        uint256 totalAgainst;
+        VotingResult result;
+        address recipient;
+        bytes callData;
+        mapping(address => VoteOption) addressOption;
+    }
+
+    struct AddressBalance {
+        uint256 balance;
+        uint256 timestamp;
+        uint256 withdrawTime;
+    }
+
+    uint256 public constant minimumQuorumPercentage = 50;
+
+    IERC20 public ercContract;
+    uint256 private _votingId;
+    mapping(uint256 => Voting) private _idVoting;
+    mapping(address => AddressBalance) private _addressBalance;
+    mapping(uint256 => mapping(address => address)) private _voteDelegation;
+
+    event VotingCreated(uint256 indexed _votingId, string description);
+    event Vote(
+        uint256 indexed _votingId,
+        address voter,
+        VoteOption option,
+        uint256 voteAmount
+    );
+    event VotingFinished(
+        uint256 indexed _votingId,
+        uint256 totalVoted,
+        VotingResult result
+    );
+
+    constructor(address _ercContract) {
+        ercContract = IERC20(_ercContract);
+    }
+
+    modifier validVoting(uint256 id) {
+        require(_idVoting[id].createdAt > 0, "Voting not found");
+        _;
+    }
+
+    function createVoting(
+        string memory description,
+        address recipient,
+        bytes memory callData
+    ) external {
+        uint256 duration = 3 * (60 * 60 * 24); // 3 days in seconds
+        Voting storage voting = _idVoting[_votingId++];
+        voting.result = VotingResult.NONE;
+        voting.description = description;
+        voting.createdAt = block.timestamp;
+        voting.duration = duration;
+        voting.recipient = recipient;
+        voting.callData = callData;
+        voting.totalSupplyAtCreation = ercContract.totalSupply();
+
+        emit VotingCreated(_votingId - 1, description);
+    }
+
+    function delegateVotesTo(uint256 votingId, address delegateAddress)
+        external
+        validVoting(votingId)
+    {
+        _voteDelegation[votingId][msg.sender] = delegateAddress;
+    }
+
+    function vote(uint256 votingId, VoteOption option) external {
+        _vote(votingId, msg.sender, option);
+    }
+
+    function voteFor(
+        uint256 votingId,
+        address votingAddress,
+        VoteOption option
+    ) external {
+        require(
+            _voteDelegation[votingId][votingAddress] == msg.sender,
+            "You cannot vote for this address"
+        );
+        _vote(votingId, votingAddress, option);
+    }
+
+    function finishVoting(uint256 votingId) external validVoting(votingId) {
+        Voting storage voting = _idVoting[votingId];
+        uint256 votingEndTime = voting.createdAt + voting.duration;
+        require(block.timestamp > votingEndTime, "Too early to finish");
+        require(voting.result == VotingResult.NONE, "Voting already finished");
+
+        VotingResult result;
+        uint256 totalVoted = voting.totalFor + voting.totalAgainst;
+        uint256 minimumQuorum = (voting.totalSupplyAtCreation *
+            minimumQuorumPercentage) / 100;
+
+        if (totalVoted >= minimumQuorum) {
+            if (voting.totalFor > voting.totalAgainst) {
+                result = VotingResult.ACCEPTED;
+            } else {
+                result = VotingResult.REJECTED;
+            }
+        } else {
+            result = VotingResult.INVALID;
+        }
+
+        voting.result = result;
+
+        if (result == VotingResult.ACCEPTED) {
+            (bool success, ) = voting.recipient.call(voting.callData);
+            require(success, "Voting finished unsuccessfully");
+        }
+
+        emit VotingFinished(votingId, totalVoted, result);
+    }
+
+    function getAddressVote(uint256 votingId, address voterAddress)
+        external
+        view
+        returns (VoteOption)
+    {
+        return _idVoting[votingId].addressOption[voterAddress];
+    }
+
+    function getVotingDetail(uint256 votingId)
+        external
+        view
+        validVoting(votingId)
+        returns (
+            string memory description,
+            uint256 createdAt,
+            uint256 duration,
+            uint256 totalSupplyAtCreation,
+            uint256 totalFor,
+            uint256 totalAgainst,
+            VotingResult result,
+            address recipient,
+            bytes memory callData
+        )
+    {
+        Voting storage voting = _idVoting[votingId];
+
+        return (
+            voting.description,
+            voting.createdAt,
+            voting.duration,
+            voting.totalSupplyAtCreation,
+            voting.totalFor,
+            voting.totalAgainst,
+            voting.result,
+            voting.recipient,
+            voting.callData
+        );
+    }
+
+    function deposit(uint256 amount) external {
+        AddressBalance storage balance = _addressBalance[msg.sender];
+        balance.balance += amount;
+        balance.timestamp = block.timestamp;
+        // Assuming user approved tokens for this contract
+        ercContract.transferFrom(msg.sender, address(this), amount);
+    }
+
+    function withdraw() external {
+        AddressBalance storage balance = _addressBalance[msg.sender];
+        require(
+            block.timestamp > balance.withdrawTime,
+            "Too early to withdraw"
+        );
+        uint256 amount = balance.balance;
+        balance.balance = 0;
+        balance.timestamp = block.timestamp;
+        ercContract.transfer(msg.sender, amount);
+    }
+
+    function _vote(
+        uint256 votingId,
+        address votingAddress,
+        VoteOption option
+    ) private validVoting(votingId) {
+        Voting storage voting = _idVoting[votingId];
+        AddressBalance storage balance = _addressBalance[votingAddress];
+        uint256 votingEndTime = voting.createdAt + voting.duration;
+        require(votingEndTime > block.timestamp, "Voting is already ended");
+        require(option != VoteOption.NONE, "Invalid vote");
+        require(
+            voting.addressOption[votingAddress] == VoteOption.NONE,
+            "The adress already voted"
+        );
+
+        uint256 amountToVote = balance.balance;
+
+        require(amountToVote > 1, "Balance is not enough for voting");
+
+        voting.addressOption[votingAddress] = option;
+
+        if (option == VoteOption.FOR) {
+            voting.totalFor += amountToVote;
+        } else {
+            voting.totalAgainst += amountToVote;
+        }
+
+        if (votingEndTime > balance.withdrawTime)
+            balance.withdrawTime = votingEndTime;
+
+        emit Vote(votingId, votingAddress, option, amountToVote);
+    }
+}
