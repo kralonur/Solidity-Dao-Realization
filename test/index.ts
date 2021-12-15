@@ -174,6 +174,12 @@ describe("DAO", function () {
         const callData = getApproveCallData(owner);
         await contract["createVoting(string,address,bytes)"](description, recipient, callData);
 
+        // new voting with later end time
+        await ethers.provider.send('evm_increaseTime', [(60 * 60 * 24)]); // simulate 1 day passed
+        await contract["createVoting(string,address,bytes)"](description, recipient, callData);
+
+        // owner votes FOR
+        await contract.vote(1, 1);
         // owner votes FOR
         await contract.vote(0, 1);
 
@@ -295,6 +301,114 @@ describe("DAO", function () {
         expect((await contract.getAddressVote(0, owner.address)))
             .to.equal(2);
     });
+
+    it("Should finish voting", async function () {
+        const ercContract = await getErcContract(owner, contract);
+
+        const user1 = accounts[1];
+        const user2 = accounts[2];
+
+        const mintOwner = 1000;
+        ercContract.mint(owner.address, mintOwner);
+        const mintUser1 = 500;
+        ercContract.mint(user1.address, mintUser1);
+        const mintUser2 = 500;
+        ercContract.mint(user2.address, mintUser2);
+
+        await contract.setErcContract(ercContract.address);
+
+        await ercContract.approve(contract.address, mintOwner);
+        await ercContract.connect(user1).approve(contract.address, mintUser1);
+        await ercContract.connect(user2).approve(contract.address, mintUser2);
+        await contract.deposit(mintOwner);
+        await contract.connect(user1).deposit(mintUser1);
+        await contract.connect(user2).deposit(mintUser2);
+
+        let description = "Standard voting accepted";
+        let recipient = ercContract.address;
+        let callData = getApproveCallData(owner);
+        await contract["createVoting(string,address,bytes)"](description, recipient, callData);
+
+        description = "Standard voting rejected";
+        recipient = ercContract.address;
+        callData = getApproveCallData(owner);
+        await contract["createVoting(string,address,bytes)"](description, recipient, callData);
+
+        description = "Standard voting accepted call error";
+        recipient = ercContract.address;
+        callData = getApproveCallDataError(owner);
+        await contract["createVoting(string,address,bytes)"](description, recipient, callData);
+
+        description = "No recipient voting";
+        await contract["createVoting(string)"](description);
+
+        description = "No recipient voting invalid";
+        await contract["createVoting(string)"](description);
+
+        const standardAccepted = 0;
+        const standardRejected = 1;
+        const standardCallError = 2;
+        const noRecipient = 3;
+        const noRecipientInvalid = 4;
+
+        // Standard voting accepted
+        await contract.vote(standardAccepted, 1);
+        await contract.connect(user1).vote(standardAccepted, 2);
+
+        // Standard voting rejected
+        await contract.vote(standardRejected, 2);
+        await contract.connect(user1).vote(standardRejected, 1);
+
+        // Standard voting accepted call error
+        await contract.vote(standardCallError, 1);
+        await contract.connect(user1).vote(standardCallError, 2);
+
+        // No recipient voting
+        await contract.vote(noRecipient, 1);
+        await contract.connect(user1).vote(noRecipient, 2);
+
+        // No recipient voting invalid
+        await contract.connect(user1).vote(noRecipientInvalid, 2);
+
+        // before time up
+        await expect(contract.finishVoting(standardAccepted))
+            .to.be.revertedWith("Too early to finish");
+
+        // simulate voting time ended (3 days passed)
+        await simulateVotingEnded();
+
+        // Standard voting accepted - result
+        await contract.finishVoting(standardAccepted);
+        expect((await contract.getVotingDetail(standardAccepted)).result)
+            .to.equal(1);
+        // check if calldata worked (approve amount from contract to owner should be 100)
+        expect((await ercContract.allowance(contract.address, owner.address)))
+            .to.equal(100);
+        // finish voting again
+        await expect(contract.finishVoting(standardAccepted))
+            .to.be.revertedWith("Voting already finished");
+
+        // Standard voting rejected - result
+        await contract.finishVoting(standardRejected);
+        expect((await contract.getVotingDetail(standardRejected)).result)
+            .to.equal(2);
+
+        // Standard voting accepted call error - result
+        await expect(contract.finishVoting(standardCallError))
+            .to.be.revertedWith("Voting finished unsuccessfully");
+        expect((await contract.getVotingDetail(standardCallError)).result)
+            .to.equal(0);
+
+        // No recipient voting - result
+        await contract.finishVoting(noRecipient);
+        expect((await contract.getVotingDetail(noRecipient)).result)
+            .to.equal(1);
+
+        // No recipient voting invalid - result
+        await contract.finishVoting(noRecipientInvalid);
+        expect((await contract.getVotingDetail(noRecipientInvalid)).result)
+            .to.equal(3);
+    });
 })
 
 async function simulateVotingEnded() {
@@ -308,6 +422,14 @@ function getApproveCallData(owner: SignerWithAddress) {
     ];
     let iface = new ethers.utils.Interface(ABI);
     return iface.encodeFunctionData("approve", [owner.address, 100]);
+}
+
+function getApproveCallDataError(owner: SignerWithAddress) {
+    let ABI = [
+        "function approve(address spender, uint256 amount)"
+    ];
+    let iface = new ethers.utils.Interface(ABI);
+    return iface.encodeFunctionData("approve", [ethers.constants.AddressZero, 100]);
 }
 
 async function getErcContract(owner: SignerWithAddress, contract: DAO) {
