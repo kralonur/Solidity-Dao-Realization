@@ -82,12 +82,7 @@ contract DAO {
         address recipient,
         bytes memory callData
     ) external {
-        _createVoting(
-            description,
-            VotingType.NO_RECIPIENT,
-            recipient,
-            callData
-        );
+        _createVoting(description, VotingType.STANDART, recipient, callData);
     }
 
     function createVoting(string memory description) external {
