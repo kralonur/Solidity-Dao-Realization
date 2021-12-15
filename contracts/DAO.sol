@@ -197,6 +197,7 @@ contract DAO {
 
     function withdraw() external {
         AddressBalance storage balance = _addressBalance[msg.sender];
+        require(balance.balance > 0, "This address balance is empty");
         require(
             block.timestamp > balance.withdrawTime,
             "Too early to withdraw"

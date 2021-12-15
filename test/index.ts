@@ -126,6 +126,78 @@ describe("DAO", function () {
             .to.equal(mintOwner + mintUser);
     });
 
+    it("Should withdraw", async function () {
+        const ercContract = await getErcContract(owner, contract);
+
+        const mintOwner = 1000;
+        ercContract.mint(owner.address, mintOwner);
+
+        await contract.setErcContract(ercContract.address);
+
+        // approve tokens for deposit
+        await ercContract.approve(contract.address, mintOwner);
+
+        // deposit owner
+        await contract.deposit(mintOwner);
+        // after deposit owner
+        expect(await ercContract.balanceOf(owner.address))
+            .to.equal(0);
+        expect(await ercContract.balanceOf(contract.address))
+            .to.equal(mintOwner);
+
+        // withdraw accounts[1]
+        await expect(contract.connect(accounts[1]).withdraw())
+            .to.be.revertedWith("This address balance is empty");
+
+        // withdraw owner
+        await contract.withdraw();
+        // after withdraw owner
+        expect(await ercContract.balanceOf(owner.address))
+            .to.equal(mintOwner);
+        expect(await ercContract.balanceOf(contract.address))
+            .to.equal(0);
+    });
+
+    it("Should withdraw after voting", async function () {
+        const ercContract = await getErcContract(owner, contract);
+
+        const mintOwner = 1000;
+        ercContract.mint(owner.address, mintOwner);
+
+        await contract.setErcContract(ercContract.address);
+
+        await ercContract.approve(contract.address, mintOwner);
+        await contract.deposit(mintOwner);
+
+        const description = "Standard voting";
+        const recipient = ercContract.address;
+        const callData = getApproveCallData(owner);
+        await contract["createVoting(string,address,bytes)"](description, recipient, callData);
+
+        // owner votes FOR
+        await contract.vote(0, 1);
+
+        // withdraw before voting ends
+        await expect(contract.withdraw())
+            .to.be.revertedWith("Too early to withdraw");
+
+        // before withdraw
+        expect(await ercContract.balanceOf(owner.address))
+            .to.equal(0);
+        expect(await ercContract.balanceOf(contract.address))
+            .to.equal(mintOwner);
+
+        // after voting ended
+        await simulateVotingEnded();
+        await contract.withdraw();
+
+        // after withdraw
+        expect(await ercContract.balanceOf(owner.address))
+            .to.equal(mintOwner);
+        expect(await ercContract.balanceOf(contract.address))
+            .to.equal(0);
+    });
+
     it("Should vote", async function () {
         const ercContract = await getErcContract(owner, contract);
 
