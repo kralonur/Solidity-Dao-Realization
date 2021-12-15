@@ -239,7 +239,7 @@ contract DAO {
         require(option != VoteOption.NONE, "Invalid vote");
         require(
             voting.addressOption[votingAddress] == VoteOption.NONE,
-            "The adress already voted"
+            "The address already voted"
         );
 
         uint256 amountToVote = balance.balance;

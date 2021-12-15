@@ -29,7 +29,6 @@ describe("DAO", function () {
             .to.equal(ercContract.address);
     });
 
-
     it("Should create no recipient voting", async function () {
         const ercContract = await getErcContract(owner, contract);
 
@@ -87,6 +86,57 @@ describe("DAO", function () {
         // Total supply should be equal to minted amount
         expect((await contract.getVotingDetail(0)).totalSupplyAtCreation)
             .to.equal(totalSupply);
+    });
+
+    it("Should vote", async function () {
+        const ercContract = await getErcContract(owner, contract);
+
+        const mintOwner = 1000;
+        ercContract.mint(owner.address, mintOwner);
+        const mintUser = 500;
+        ercContract.mint(accounts[1].address, mintUser);
+
+        await contract.setErcContract(ercContract.address);
+
+        // approve tokens for deposit
+        await ercContract.approve(contract.address, mintOwner);
+        await ercContract.connect(accounts[1]).approve(contract.address, mintUser);
+
+        const description = "Standard voting";
+        const recipient = ercContract.address;
+        const callData = getApproveCallData(owner);
+
+        // test before creating vote
+        await expect(contract.vote(0, 1))
+            .to.be.revertedWith("Voting not found");
+
+        await contract["createVoting(string,address,bytes)"](description, recipient, callData);
+
+        // test before depositing
+        await expect(contract.vote(0, 1))
+            .to.be.revertedWith("Balance is not enough for voting");
+
+        // deposit tokens
+        await contract.deposit(mintOwner);
+        await contract.connect(accounts[1]).deposit(mintUser);
+
+        // test invalid vote
+        await expect(contract.vote(0, 0))
+            .to.be.revertedWith("Invalid vote");
+
+        // owner votes FOR
+        await contract.vote(0, 1);
+        // accounts[1] votes AGAINST
+        await contract.connect(accounts[1]).vote(0, 2);
+
+        expect((await contract.getVotingDetail(0)).totalFor)
+            .to.equal(mintOwner);
+        expect((await contract.getVotingDetail(0)).totalAgainst)
+            .to.equal(mintUser);
+
+        // test voting again
+        await expect(contract.vote(0, 2))
+            .to.be.revertedWith("The address already voted");
     });
 })
 
