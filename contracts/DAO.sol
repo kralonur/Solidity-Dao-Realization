@@ -42,7 +42,7 @@ contract DAO {
     uint256 private _votingId;
     mapping(uint256 => Voting) private _idVoting;
     mapping(address => AddressBalance) private _addressBalance;
-    mapping(uint256 => mapping(address => address)) private _voteDelegation;
+    mapping(address => address) private _voteDelegation;
 
     event VotingCreated(uint256 indexed _votingId, string description);
     event Vote(
@@ -84,11 +84,8 @@ contract DAO {
         emit VotingCreated(_votingId - 1, description);
     }
 
-    function delegateVotesTo(uint256 votingId, address delegateAddress)
-        external
-        validVoting(votingId)
-    {
-        _voteDelegation[votingId][msg.sender] = delegateAddress;
+    function delegateVotesTo(address delegateAddress) external {
+        _voteDelegation[msg.sender] = delegateAddress;
     }
 
     function vote(uint256 votingId, VoteOption option) external {
@@ -101,7 +98,11 @@ contract DAO {
         VoteOption option
     ) external {
         require(
-            _voteDelegation[votingId][votingAddress] == msg.sender,
+            _voteDelegation[votingAddress] != address(0),
+            "This address did not delegate his votes to any address yet"
+        );
+        require(
+            _voteDelegation[votingAddress] == msg.sender,
             "You cannot vote for this address"
         );
         _vote(votingId, votingAddress, option);
