@@ -137,8 +137,18 @@ describe("DAO", function () {
         // test voting again
         await expect(contract.vote(0, 2))
             .to.be.revertedWith("The address already voted");
+
+        await simulateVotingEnded();
+        // test voting, after voting ended
+        await expect(contract.vote(0, 1))
+            .to.be.revertedWith("Voting is already ended");
     });
 })
+
+async function simulateVotingEnded() {
+    const duration = 3 * (60 * 60 * 24); // 3days is standard
+    await ethers.provider.send('evm_increaseTime', [duration]);
+}
 
 function getApproveCallData(owner: SignerWithAddress) {
     let ABI = [
