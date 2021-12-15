@@ -68,13 +68,13 @@ contract DAO {
         VotingResult result
     );
 
-    constructor(address _ercContract) {
-        ercContract = IERC20(_ercContract);
-    }
-
     modifier validVoting(uint256 id) {
         require(_idVoting[id].createdAt > 0, "Voting not found");
         _;
+    }
+
+    function setErcContract(address _ercContract) external {
+        ercContract = IERC20(_ercContract);
     }
 
     function createVoting(

@@ -27,6 +27,7 @@ export interface DAOInterface extends utils.Interface {
     "getAddressVote(uint256,address)": FunctionFragment;
     "getVotingDetail(uint256)": FunctionFragment;
     "minimumQuorumPercentage()": FunctionFragment;
+    "setErcContract(address)": FunctionFragment;
     "vote(uint256,uint8)": FunctionFragment;
     "voteFor(uint256,address,uint8)": FunctionFragment;
     "withdraw()": FunctionFragment;
@@ -65,6 +66,10 @@ export interface DAOInterface extends utils.Interface {
     values?: undefined
   ): string;
   encodeFunctionData(
+    functionFragment: "setErcContract",
+    values: [string]
+  ): string;
+  encodeFunctionData(
     functionFragment: "vote",
     values: [BigNumberish, BigNumberish]
   ): string;
@@ -101,6 +106,10 @@ export interface DAOInterface extends utils.Interface {
   ): Result;
   decodeFunctionResult(
     functionFragment: "minimumQuorumPercentage",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "setErcContract",
     data: BytesLike
   ): Result;
   decodeFunctionResult(functionFragment: "vote", data: BytesLike): Result;
@@ -232,6 +241,11 @@ export interface DAO extends BaseContract {
 
     minimumQuorumPercentage(overrides?: CallOverrides): Promise<[BigNumber]>;
 
+    setErcContract(
+      _ercContract: string,
+      overrides?: Overrides & { from?: string | Promise<string> }
+    ): Promise<ContractTransaction>;
+
     vote(
       votingId: BigNumberish,
       option: BigNumberish,
@@ -316,6 +330,11 @@ export interface DAO extends BaseContract {
 
   minimumQuorumPercentage(overrides?: CallOverrides): Promise<BigNumber>;
 
+  setErcContract(
+    _ercContract: string,
+    overrides?: Overrides & { from?: string | Promise<string> }
+  ): Promise<ContractTransaction>;
+
   vote(
     votingId: BigNumberish,
     option: BigNumberish,
@@ -396,6 +415,11 @@ export interface DAO extends BaseContract {
     >;
 
     minimumQuorumPercentage(overrides?: CallOverrides): Promise<BigNumber>;
+
+    setErcContract(
+      _ercContract: string,
+      overrides?: CallOverrides
+    ): Promise<void>;
 
     vote(
       votingId: BigNumberish,
@@ -493,6 +517,11 @@ export interface DAO extends BaseContract {
 
     minimumQuorumPercentage(overrides?: CallOverrides): Promise<BigNumber>;
 
+    setErcContract(
+      _ercContract: string,
+      overrides?: Overrides & { from?: string | Promise<string> }
+    ): Promise<BigNumber>;
+
     vote(
       votingId: BigNumberish,
       option: BigNumberish,
@@ -554,6 +583,11 @@ export interface DAO extends BaseContract {
 
     minimumQuorumPercentage(
       overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
+    setErcContract(
+      _ercContract: string,
+      overrides?: Overrides & { from?: string | Promise<string> }
     ): Promise<PopulatedTransaction>;
 
     vote(
