@@ -2,7 +2,9 @@
 /* tslint:disable */
 /* eslint-disable */
 export type { DAO } from "./DAO";
+export type { ERC20Token } from "./ERC20Token";
 export type { IERC20 } from "./IERC20";
 
 export { DAO__factory } from "./factories/DAO__factory";
+export { ERC20Token__factory } from "./factories/ERC20Token__factory";
 export { IERC20__factory } from "./factories/IERC20__factory";

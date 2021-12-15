@@ -82,12 +82,7 @@ contract DAO {
         address recipient,
         bytes memory callData
     ) external {
-        _createVoting(
-            description,
-            VotingType.NO_RECIPIENT,
-            recipient,
-            callData
-        );
+        _createVoting(description, VotingType.STANDART, recipient, callData);
     }
 
     function createVoting(string memory description) external {
@@ -202,6 +197,7 @@ contract DAO {
 
     function withdraw() external {
         AddressBalance storage balance = _addressBalance[msg.sender];
+        require(balance.balance > 0, "This address balance is empty");
         require(
             block.timestamp > balance.withdrawTime,
             "Too early to withdraw"
@@ -244,7 +240,7 @@ contract DAO {
         require(option != VoteOption.NONE, "Invalid vote");
         require(
             voting.addressOption[votingAddress] == VoteOption.NONE,
-            "The adress already voted"
+            "The address already voted"
         );
 
         uint256 amountToVote = balance.balance;
