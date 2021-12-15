@@ -88,6 +88,44 @@ describe("DAO", function () {
             .to.equal(totalSupply);
     });
 
+    it("Should deposit", async function () {
+        const ercContract = await getErcContract(owner, contract);
+
+        const mintOwner = 1000;
+        ercContract.mint(owner.address, mintOwner);
+        const mintUser = 500;
+        ercContract.mint(accounts[1].address, mintUser);
+
+        await contract.setErcContract(ercContract.address);
+
+        // approve tokens for deposit
+        await ercContract.approve(contract.address, mintOwner);
+        await ercContract.connect(accounts[1]).approve(contract.address, mintUser);
+
+        // before deposit
+        expect(await ercContract.balanceOf(owner.address))
+            .to.equal(mintOwner);
+        expect(await ercContract.balanceOf(accounts[1].address))
+            .to.equal(mintUser);
+
+        // deposit owner
+        await contract.deposit(mintOwner);
+        // after deposit owner
+        expect(await ercContract.balanceOf(owner.address))
+            .to.equal(0);
+        expect(await ercContract.balanceOf(contract.address))
+            .to.equal(mintOwner);
+
+
+        // deposit accounts[1]
+        await contract.connect(accounts[1]).deposit(mintUser);
+        // after deposit accounts[1]
+        expect(await ercContract.balanceOf(accounts[1].address))
+            .to.equal(0);
+        expect(await ercContract.balanceOf(contract.address))
+            .to.equal(mintOwner + mintUser);
+    });
+
     it("Should vote", async function () {
         const ercContract = await getErcContract(owner, contract);
 
