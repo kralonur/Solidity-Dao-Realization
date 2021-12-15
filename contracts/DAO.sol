@@ -17,6 +17,12 @@ contract DAO {
         INVALID
     }
 
+    enum VotingType {
+        NONE,
+        STANDART,
+        NO_RECIPIENT
+    }
+
     struct Voting {
         string description;
         uint256 createdAt;
@@ -25,6 +31,7 @@ contract DAO {
         uint256 totalFor;
         uint256 totalAgainst;
         VotingResult result;
+        VotingType votingType;
         address recipient;
         bytes callData;
         mapping(address => VoteOption) addressOption;
@@ -44,15 +51,19 @@ contract DAO {
     mapping(address => AddressBalance) private _addressBalance;
     mapping(address => address) private _voteDelegation;
 
-    event VotingCreated(uint256 indexed _votingId, string description);
+    event VotingCreated(
+        uint256 indexed votingId,
+        string description,
+        VotingType votingType
+    );
     event Vote(
-        uint256 indexed _votingId,
+        uint256 indexed votingId,
         address voter,
         VoteOption option,
         uint256 voteAmount
     );
     event VotingFinished(
-        uint256 indexed _votingId,
+        uint256 indexed votingId,
         uint256 totalVoted,
         VotingResult result
     );
@@ -71,17 +82,16 @@ contract DAO {
         address recipient,
         bytes memory callData
     ) external {
-        uint256 duration = 3 * (60 * 60 * 24); // 3 days in seconds
-        Voting storage voting = _idVoting[_votingId++];
-        voting.result = VotingResult.NONE;
-        voting.description = description;
-        voting.createdAt = block.timestamp;
-        voting.duration = duration;
-        voting.recipient = recipient;
-        voting.callData = callData;
-        voting.totalSupplyAtCreation = ercContract.totalSupply();
+        _createVoting(
+            description,
+            VotingType.NO_RECIPIENT,
+            recipient,
+            callData
+        );
+    }
 
-        emit VotingCreated(_votingId - 1, description);
+    function createVoting(string memory description) external {
+        _createVoting(description, VotingType.NO_RECIPIENT, address(0), "");
     }
 
     function delegateVotesTo(address delegateAddress) external {
@@ -132,8 +142,10 @@ contract DAO {
         voting.result = result;
 
         if (result == VotingResult.ACCEPTED) {
-            (bool success, ) = voting.recipient.call(voting.callData);
-            require(success, "Voting finished unsuccessfully");
+            if (voting.votingType == VotingType.STANDART) {
+                (bool success, ) = voting.recipient.call(voting.callData);
+                require(success, "Voting finished unsuccessfully");
+            }
         }
 
         emit VotingFinished(votingId, totalVoted, result);
@@ -159,6 +171,7 @@ contract DAO {
             uint256 totalFor,
             uint256 totalAgainst,
             VotingResult result,
+            VotingType votingType,
             address recipient,
             bytes memory callData
         )
@@ -173,6 +186,7 @@ contract DAO {
             voting.totalFor,
             voting.totalAgainst,
             voting.result,
+            voting.votingType,
             voting.recipient,
             voting.callData
         );
@@ -196,6 +210,26 @@ contract DAO {
         balance.balance = 0;
         balance.timestamp = block.timestamp;
         ercContract.transfer(msg.sender, amount);
+    }
+
+    function _createVoting(
+        string memory description,
+        VotingType votingType,
+        address recipient,
+        bytes memory callData
+    ) private {
+        uint256 duration = 3 * (60 * 60 * 24); // 3 days in seconds
+        Voting storage voting = _idVoting[_votingId++];
+        voting.result = VotingResult.NONE;
+        voting.votingType = votingType;
+        voting.description = description;
+        voting.createdAt = block.timestamp;
+        voting.duration = duration;
+        voting.recipient = recipient;
+        voting.callData = callData;
+        voting.totalSupplyAtCreation = ercContract.totalSupply();
+
+        emit VotingCreated(_votingId - 1, description, votingType);
     }
 
     function _vote(

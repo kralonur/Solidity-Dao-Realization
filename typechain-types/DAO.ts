@@ -109,7 +109,7 @@ export interface DAOInterface extends utils.Interface {
 
   events: {
     "Vote(uint256,address,uint8,uint256)": EventFragment;
-    "VotingCreated(uint256,string)": EventFragment;
+    "VotingCreated(uint256,string,uint8)": EventFragment;
     "VotingFinished(uint256,uint256,uint8)": EventFragment;
   };
 
@@ -120,21 +120,21 @@ export interface DAOInterface extends utils.Interface {
 
 export type VoteEvent = TypedEvent<
   [BigNumber, string, number, BigNumber],
-  { _votingId: BigNumber; voter: string; option: number; voteAmount: BigNumber }
+  { votingId: BigNumber; voter: string; option: number; voteAmount: BigNumber }
 >;
 
 export type VoteEventFilter = TypedEventFilter<VoteEvent>;
 
 export type VotingCreatedEvent = TypedEvent<
-  [BigNumber, string],
-  { _votingId: BigNumber; description: string }
+  [BigNumber, string, number],
+  { votingId: BigNumber; description: string; votingType: number }
 >;
 
 export type VotingCreatedEventFilter = TypedEventFilter<VotingCreatedEvent>;
 
 export type VotingFinishedEvent = TypedEvent<
   [BigNumber, BigNumber, number],
-  { _votingId: BigNumber; totalVoted: BigNumber; result: number }
+  { votingId: BigNumber; totalVoted: BigNumber; result: number }
 >;
 
 export type VotingFinishedEventFilter = TypedEventFilter<VotingFinishedEvent>;
@@ -166,10 +166,15 @@ export interface DAO extends BaseContract {
   removeListener: OnEvent<this>;
 
   functions: {
-    createVoting(
+    "createVoting(string,address,bytes)"(
       description: string,
       recipient: string,
       callData: BytesLike,
+      overrides?: Overrides & { from?: string | Promise<string> }
+    ): Promise<ContractTransaction>;
+
+    "createVoting(string)"(
+      description: string,
       overrides?: Overrides & { from?: string | Promise<string> }
     ): Promise<ContractTransaction>;
 
@@ -208,6 +213,7 @@ export interface DAO extends BaseContract {
         BigNumber,
         BigNumber,
         number,
+        number,
         string,
         string
       ] & {
@@ -218,6 +224,7 @@ export interface DAO extends BaseContract {
         totalFor: BigNumber;
         totalAgainst: BigNumber;
         result: number;
+        votingType: number;
         recipient: string;
         callData: string;
       }
@@ -243,10 +250,15 @@ export interface DAO extends BaseContract {
     ): Promise<ContractTransaction>;
   };
 
-  createVoting(
+  "createVoting(string,address,bytes)"(
     description: string,
     recipient: string,
     callData: BytesLike,
+    overrides?: Overrides & { from?: string | Promise<string> }
+  ): Promise<ContractTransaction>;
+
+  "createVoting(string)"(
+    description: string,
     overrides?: Overrides & { from?: string | Promise<string> }
   ): Promise<ContractTransaction>;
 
@@ -285,6 +297,7 @@ export interface DAO extends BaseContract {
       BigNumber,
       BigNumber,
       number,
+      number,
       string,
       string
     ] & {
@@ -295,6 +308,7 @@ export interface DAO extends BaseContract {
       totalFor: BigNumber;
       totalAgainst: BigNumber;
       result: number;
+      votingType: number;
       recipient: string;
       callData: string;
     }
@@ -320,10 +334,15 @@ export interface DAO extends BaseContract {
   ): Promise<ContractTransaction>;
 
   callStatic: {
-    createVoting(
+    "createVoting(string,address,bytes)"(
       description: string,
       recipient: string,
       callData: BytesLike,
+      overrides?: CallOverrides
+    ): Promise<void>;
+
+    "createVoting(string)"(
+      description: string,
       overrides?: CallOverrides
     ): Promise<void>;
 
@@ -359,6 +378,7 @@ export interface DAO extends BaseContract {
         BigNumber,
         BigNumber,
         number,
+        number,
         string,
         string
       ] & {
@@ -369,6 +389,7 @@ export interface DAO extends BaseContract {
         totalFor: BigNumber;
         totalAgainst: BigNumber;
         result: number;
+        votingType: number;
         recipient: string;
         callData: string;
       }
@@ -394,44 +415,51 @@ export interface DAO extends BaseContract {
 
   filters: {
     "Vote(uint256,address,uint8,uint256)"(
-      _votingId?: BigNumberish | null,
+      votingId?: BigNumberish | null,
       voter?: null,
       option?: null,
       voteAmount?: null
     ): VoteEventFilter;
     Vote(
-      _votingId?: BigNumberish | null,
+      votingId?: BigNumberish | null,
       voter?: null,
       option?: null,
       voteAmount?: null
     ): VoteEventFilter;
 
-    "VotingCreated(uint256,string)"(
-      _votingId?: BigNumberish | null,
-      description?: null
+    "VotingCreated(uint256,string,uint8)"(
+      votingId?: BigNumberish | null,
+      description?: null,
+      votingType?: null
     ): VotingCreatedEventFilter;
     VotingCreated(
-      _votingId?: BigNumberish | null,
-      description?: null
+      votingId?: BigNumberish | null,
+      description?: null,
+      votingType?: null
     ): VotingCreatedEventFilter;
 
     "VotingFinished(uint256,uint256,uint8)"(
-      _votingId?: BigNumberish | null,
+      votingId?: BigNumberish | null,
       totalVoted?: null,
       result?: null
     ): VotingFinishedEventFilter;
     VotingFinished(
-      _votingId?: BigNumberish | null,
+      votingId?: BigNumberish | null,
       totalVoted?: null,
       result?: null
     ): VotingFinishedEventFilter;
   };
 
   estimateGas: {
-    createVoting(
+    "createVoting(string,address,bytes)"(
       description: string,
       recipient: string,
       callData: BytesLike,
+      overrides?: Overrides & { from?: string | Promise<string> }
+    ): Promise<BigNumber>;
+
+    "createVoting(string)"(
+      description: string,
       overrides?: Overrides & { from?: string | Promise<string> }
     ): Promise<BigNumber>;
 
@@ -484,10 +512,15 @@ export interface DAO extends BaseContract {
   };
 
   populateTransaction: {
-    createVoting(
+    "createVoting(string,address,bytes)"(
       description: string,
       recipient: string,
       callData: BytesLike,
+      overrides?: Overrides & { from?: string | Promise<string> }
+    ): Promise<PopulatedTransaction>;
+
+    "createVoting(string)"(
+      description: string,
       overrides?: Overrides & { from?: string | Promise<string> }
     ): Promise<PopulatedTransaction>;
 
