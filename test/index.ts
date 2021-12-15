@@ -1,7 +1,7 @@
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import { expect } from "chai";
 import { ethers } from "hardhat";
-import { DAO, DAO__factory } from "../typechain-types/";
+import { DAO, DAO__factory, ERC20Token, ERC20Token__factory } from "../typechain-types/";
 
 describe("DAO", function () {
 
@@ -19,4 +19,22 @@ describe("DAO", function () {
         contract = await tokenFactory.deploy();
         await contract.deployed();
     });
+
+    it("Should change erc contract", async function () {
+        const ercContract = await getErcContract(owner, contract);
+
+        await contract.setErcContract(ercContract.address);
+
+        expect(await contract.ercContract())
+            .to.equal(ercContract.address);
+    });
 })
+
+async function getErcContract(owner: SignerWithAddress, contract: DAO) {
+    const ercTokenFactory = new ERC20Token__factory(owner);
+    const ercContract = await ercTokenFactory.deploy();
+    await contract.deployed();
+
+    return ercContract;
+}
+
